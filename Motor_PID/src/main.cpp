@@ -10,12 +10,14 @@ bool direction = 0;
 uint8_t state = 0;
 uint8_t old_state = 0;
 int32_t counter = 0;
-uint32_t period = 100;
+int32_t old_counter = 0;
+uint32_t period = 10;
+int32_t pot=0;
 
 //Define Variables we'll be connecting to
 float Setpoint, Input, Output;
 
-float Kp = 0.2, Ki = 0.5, Kd = 0;
+float Kp = 1, Ki = 2, Kd = 0;
 
 //Specify PID links
 QuickPID myPID(&Input, &Output, &Setpoint);
@@ -33,7 +35,7 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(encA), encoder, RISING);
   MyMotor.begin();
   MyMotor.setBiDirMotorSpeed(direction, speed);
-  Setpoint = 1000;
+  Setpoint = 50;
 
   //apply PID gains
   myPID.SetTunings(Kp, Ki, Kd);
@@ -47,7 +49,9 @@ void loop()
   uint32_t curTime = millis();
   while (millis() < (curTime + period))
     ;
-  Input = counter;
+  pot = counter - old_counter;  
+  Input = pot;
+
   myPID.Compute();
   if (Output > 0)
   {
@@ -64,8 +68,11 @@ void loop()
   Serial.print(Output);
   Serial.print(" dir: ");
   Serial.print(direction);
+  Serial.print(" pot: ");
+  Serial.print(pot);
   Serial.print(" count: ");
   Serial.println(counter);
+  old_counter = counter;
 }
 
 void encoder()
