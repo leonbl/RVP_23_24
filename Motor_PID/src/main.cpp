@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "IFX007T-Motor-Control.h"
+#include <QuickPID.h>
 
 #define encA 2
 #define encB 4
@@ -11,13 +12,13 @@ uint8_t old_state = 0;
 int32_t counter = 0;
 uint32_t period = 100;
 
-// PID
-float setpoint = 100, e = 0, e_prev = 0, e_sum = 0;
-float Kp = 0.5, Kd = 0, Ki = 0.4;
-float KP = Kp;
-float KD = Kd /((float)period / 1000);
-float KI = Ki * (float)period/1000;
-float u = 0, up = 0, ui = 0, ud = 0;
+//Define Variables we'll be connecting to
+float Setpoint, Input, Output;
+
+float Kp = 0.2, Ki = 0.5, Kd = 0;
+
+//Specify PID links
+QuickPID myPID(&Input, &Output, &Setpoint);
 
 // Create an instance of 'IFX007TMotorControl' called 'MyMotor'
 IFX007TMotorControl MyMotor = IFX007TMotorControl();
@@ -32,6 +33,13 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(encA), encoder, RISING);
   MyMotor.begin();
   MyMotor.setBiDirMotorSpeed(direction, speed);
+  Setpoint = 1000;
+
+  //apply PID gains
+  myPID.SetTunings(Kp, Ki, Kd);
+  myPID.SetOutputLimits(-255, 255);
+  //turn the PID on
+  myPID.SetMode(myPID.Control::automatic);
 }
 
 void loop()
@@ -39,30 +47,21 @@ void loop()
   uint32_t curTime = millis();
   while (millis() < (curTime + period))
     ;
-  // Izračun PID
-  e = setpoint - counter;
-  up = KP * e;
-  e_sum += e;
-  ui = KI * e_sum;
-  ud = KD * (e - e_prev);
-  u = up + ui + ud;
-  e_prev = e;
-
-  if (u > 0)
+  Input = counter;
+  myPID.Compute();
+  if (Output > 0)
   {
     direction = 0;
   }
   else
   { 
-    u = abs(u);
     direction = 1;
   }
 
-  if(u > 255) u = 255;
+  MyMotor.setBiDirMotorSpeed(direction, abs(Output));
 
-  MyMotor.setBiDirMotorSpeed(direction, u);
-  Serial.print("u: ");
-  Serial.print(u);
+  Serial.print("Output: ");
+  Serial.print(Output);
   Serial.print(" dir: ");
   Serial.print(direction);
   Serial.print(" count: ");
